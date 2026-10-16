@@ -1,0 +1,849 @@
+# Changelog
+
+## GateLabR 1.6.2
+
+- A GatingSet whose gates differ between samples now opens with each
+  sample’s own gates. GateLabR 1.6.1 described the hierarchy from the
+  first sample alone, so the app gated every sample with the first
+  sample’s gate: where FlowJo had tailored a gate per sample, the app’s
+  counts on every other sample were not the object’s, and “Save to
+  GatingSet” then wrote the first sample’s gates over every sample’s
+  own. On a GatingSet CytoML parsed from FlowRepository FR-FCM-Z2V4’s
+  `S_1.wsp`, the save changed 16 of 38 node counts on the second sample
+  and 5 on the third. The hierarchy is now read on every sample: each
+  node’s gate in the app’s tree is the one most samples hold, and a
+  sample whose gate differs opens with a tailored copy of the tree
+  carrying its own, as a tailored FlowJo sample opens in the browser
+  app, so every node’s count on every sample is
+  [`gh_pop_get_count()`](https://rdrr.io/pkg/flowWorkspace/man/gh_pop_get_proportion.html)
+  for that sample. The launch note names the nodes with gates of their
+  own and the samples they are on. Needs the embedded core that reads
+  the hierarchy’s contract 2, which this version carries; an older core
+  refuses the hierarchy rather than gating every sample alike.
+- “Save to GatingSet” writes in place. A node the app holds and the user
+  did not change is left exactly as it was, its per-sample gates
+  included; a gate changed in the app is set on the samples whose gate
+  changed and on no other
+  ([`gh_pop_set_gate()`](https://rdrr.io/pkg/flowWorkspace/man/gs_pop_set_gate.html));
+  a renamed population renames its node, and a boolean naming that node
+  is rewritten to name it by its new path; a new population is added,
+  with each sample’s own gate where its gates differ
+  ([`gs_pop_add()`](https://rdrr.io/pkg/flowWorkspace/man/gs_pop_add.html)
+  given a list of gates by sample). Each node is then checked on every
+  sample against the events the app holds, and one that differs is
+  written as its gate where it was something else and as its exact
+  per-sample membership otherwise, as before. 1.6.1 removed every node
+  under the root and wrote the app’s tree back. The SCE to GatingSet
+  export
+  ([`gatelabGatingSet()`](https://david-priest.github.io/GateLabR/reference/gatelabGatingSet.md))
+  writes the same way, so a file tailored in the app gets its own gate
+  on its own sample where it got the membership.
+- Nodes the app never held survive a save unchanged, with everything
+  under them: an OR of other nodes, a node on a FlowJo calibration-table
+  channel, a NOT of an AND of several nodes, a node of fixed indices
+  written from R, a node added in R since the app opened. The console’s
+  save report and the app’s status line name them with the reason. 1.6.1
+  removed them at the first save without a word. A node the app was
+  given and the user deleted is still removed; a kept node that names a
+  deleted one cannot be evaluated without it and goes too, and the
+  report names it.
+- A boolean node NOT (A AND B) is left out by name: a GateLab population
+  ANDs its gates, so the 1.6.1 core held it as NOT A AND NOT B, which
+  holds fewer events. The host now leaves out by itself every node the
+  core would drop (an OR, a boolean naming a node left out or a node
+  without a gate of its own, a node under one left out), so that what it
+  says it sent is what the app holds. A boolean whose terms name a node
+  with a space in its name (“T cells”) is read as written; the spaces
+  were removed and the term named no node.
+- The embedded GateLab core is GateLab 0.9.3 (GateLab-dev ec0c0c6), up
+  from f040e5d: it carries the per-sample hierarchy above (contract 2),
+  the NOT of an AND left out and the save’s notes in the status line,
+  and the tab now connects only to an agent relay on this computer. The
+  0.9.0 to 0.9.2 cores, embedded since GateLabR 1.6.0, connected as the
+  page opened to a relay on any host named by `?agent=` in the page’s
+  address, and that relay could read the data the tab held and change
+  its gates; the core now accepts a `ws://` or `wss://` relay on
+  127.0.0.1, localhost or \[::1\] only and leaves any other address
+  unconnected. `launchGatingApp(agent = TRUE)` connects as before, since
+  the relay records a 127.0.0.1 address; an `agent` address on another
+  host is no longer connected to.
+- A GateLab workspace a 1.6.1 session saved on a GatingSet with tailored
+  gates holds the first sample’s gates for every sample. The launch note
+  names the tailored nodes and how to reopen the object from its own
+  gates (`flowWorkspace::gs_keyword_delete(gs, "GATELAB_WORKSPACE")`
+  before launching), which discards that workspace.
+
+## GateLabR 1.6.1
+
+- The embedded GateLab core is 0.9.1 (GateLab-dev 1bf63cd), up from
+  0.9.0: it reads a GatingSet’s hierarchy and a hosted channel’s
+  transform, shows FlowJo’s biexponential as an axis on a channel that
+  records one (its parameters stated in the Transforms panel), and keeps
+  a hosted sample’s arcsinh and biexponential when the sample joins the
+  workspace’s shared scales, which the 0.9.0 core lost, so an SCE’s row
+  transforms and a GatingSet’s arcsinh and biexponential channels open
+  as stated. Also from the core: FACSDiscover S8 cell images and a
+  Linear \$PnD honoured when reading the display an S8 file records.
+- `gatelabPopulations(by = "path")` names the columns by each
+  population’s path from the root, unique by construction (a GatingSet’s
+  node path), where the default names them by population and
+  disambiguates repeats with the id. `metadata(sce)$spillover` is the
+  documented name of the matrix an SCE carries for the app, as
+  [`flowCore::spillover()`](https://rdrr.io/pkg/flowCore/man/flowFrame-class.html)
+  returns one; the older names are still read.
+- The display transform each channel was drawn on is kept on the object:
+  every save from the app writes it to `rowData(sce)$gatelab_transform`
+  as a JSON spec per row (a logicle with T, W, M and A, an arcsinh with
+  its cofactor, FlowJo’s biexponential, or the identity), the way a
+  GatingSet keeps its transforms with its data, and
+  [`gatelabTransforms()`](https://david-priest.github.io/GateLabR/reference/gatelabTransforms.md)
+  reads it from either object. The app opens an SCE on those transforms
+  where it has no saved workspace, and an R plot can be drawn on the
+  axes the app showed.
+- `gatelabGatingSet(sce)` builds a flowWorkspace `GatingSet` from an SCE
+  gated in the app: each sample’s events from the assay the workspace
+  was drawn on (an arcsinh assay put back to linear through its
+  cofactor),
+  [`markernames()`](https://rdrr.io/pkg/flowCore/man/markernames.html)
+  from the rows,
+  [`pData()`](https://rdrr.io/pkg/Biobase/man/phenoData.html) from the
+  sample metadata, the channels on the transforms the object states, and
+  every population of the active hierarchy written as “Save to
+  GatingSet” writes them, a flowWorkspace gate where the space allows
+  and the exact per-sample membership otherwise, each gate recomputed
+  and checked against the stored membership. The GateLab record goes
+  along as the keyword, so
+  [`launchGatingApp()`](https://david-priest.github.io/GateLabR/reference/launchGatingApp.md)
+  on the result opens the same workspace, and
+  [`gatelabPopulations()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md)
+  reads the same memberships from either object. flowWorkspace evaluates
+  the gates from there, `ggcyto` draws them and CytoML exports them.
+- `launchGatingApp(gs)` accepts a flowWorkspace `GatingSet`, and serves
+  it from the object itself: no SingleCellExperiment is built. The app
+  opens on the object’s samples with the
+  [`pData()`](https://rdrr.io/pkg/Biobase/man/phenoData.html) columns as
+  sample metadata, drawing each sample’s values read from its cytoframe
+  one channel at a time as the app asks for them and put back to linear
+  through the channel’s inverse transform (the values flowWorkspace
+  holds are compensated, so the app applies no matrix a second time; the
+  matrix it carries is shown). The hierarchy the object holds opens as
+  the app’s gates, each evaluated in the transformed space the object
+  evaluates it in: rectangles, polygons, ellipses, quadrant sets (as one
+  quadrant gate), negated nodes and `&`/`!` booleans over node names; an
+  OR node, or one whose channel is on a FlowJo calibration table, is
+  left out by name. The app’s axes take the object’s transforms: a
+  logicle is shown as the object’s own, an arcsinh at its cofactor; a
+  FlowJo-derived object’s biexponential channels open on that
+  biexponential, at the object’s parameters (the embedded core shows it
+  as an axis), and a FlowJo log channel keeps the app’s default axis,
+  its gates still exact through their own transforms. The biexponential
+  is flowWorkspace’s own: the app builds cytolib’s table from the
+  parameters, equal to five thousandths of a channel. The workspace is
+  kept as a keyword (`GATELAB_WORKSPACE`) on every sample’s cytoframe,
+  which
+  [`save_gs()`](https://rdrr.io/pkg/flowWorkspace/man/save_gs.html)
+  keeps, and “Save to GatingSet” writes every population of the tree
+  back to the hierarchy, in place: a rectangle as a `rectangleGate`
+  under any pair of transforms, a polygon or ellipse as its gate when
+  the app’s space is the object’s, and every other population as its
+  exact per-sample membership; each gate written is recomputed and
+  replaced by the membership if flowWorkspace selected other events. The
+  colData export dialog writes populations as nodes under the root; the
+  panel dialog writes
+  [`markernames()`](https://rdrr.io/pkg/flowCore/man/markernames.html);
+  a pData column colours plots. A spillover matrix applied in the app is
+  applied to the object in place with
+  [`flowWorkspace::compensate()`](https://rdrr.io/pkg/flowCore/man/compensation-class.html)
+  when the object is writable, uncompensated and untransformed, as a
+  GatingSet user compensates at the prompt: the object’s one assay
+  becomes `compensated`, the uncompensated values are gone from it as
+  they are after
+  [`compensate()`](https://rdrr.io/pkg/flowCore/man/compensation-class.html),
+  and the application is kept as a keyword so a reopened object restores
+  the app’s compensated layer; otherwise the matrix is refused with the
+  reason (a GatingSet from
+  [`load_gs()`](https://rdrr.io/pkg/flowWorkspace/man/save_gs.html) is
+  read-only on its data, a compensated one cannot be uncompensated,
+  compensation precedes transformation, and mass cytometry’s NNLS has no
+  in-place form).
+  [`gatelabHierarchy()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md),
+  [`gatelabPopulations()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md)
+  and
+  [`gatelabLeafPopulation()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md)
+  read a GatingSet’s hierarchy;
+  [`gatelabSync()`](https://david-priest.github.io/GateLabR/reference/gatelabSync.md)
+  takes a GatingSet. flowWorkspace is a suggested package; the embedded
+  core is the one that reads a GatingSet’s hierarchy.
+- [`gatelabStrategyPlot()`](https://david-priest.github.io/GateLabR/reference/gatelabStrategyPlot.md)
+  draws the gating strategy of a saved object in R as the Strategy tab
+  draws it in its “Multiple pops” mode with the samples pooled: one
+  contour panel per parent population and pair of channels, with every
+  gate its children draw there, each gate’s name and share, a quadrant
+  gate as a crosshair with its four shares, and an arrow from each gate
+  to the panel of the population it makes. The gates are read from the
+  saved workspace and the counts from the memberships “Save to SCE”
+  stores, through
+  [`gatelabPopulations()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md),
+  so a population made by one gate has the app’s own count and is not
+  gated again in R; a gate of a population made by several, and a
+  quadrant no population was made for, are counted from the gate’s
+  geometry. The result is a grid drawing of a fixed size, in the app’s
+  CSS pixels at 96 to the inch, which
+  [`print()`](https://rdrr.io/r/base/print.html) and
+  [`plot()`](https://rdrr.io/r/base/plot.html) draw on the current
+  device; its size in inches and a table of the counts are attributes.
+  [`gatelabPanelGrob()`](https://david-priest.github.io/GateLabR/reference/gatelabPanelGrob.md)
+  draws one such panel from events and gates given to it,
+  [`gatelabContour()`](https://david-priest.github.io/GateLabR/reference/gatelabContour.md)
+  computes the contour lines and outlier dots of the app’s contour mode
+  (a port of `d3.contourDensity()`), and
+  [`gatelabDisplayEvents()`](https://david-priest.github.io/GateLabR/reference/gatelabDisplayEvents.md)
+  picks the events a plot pooled over samples draws. Only the hierarchy
+  that was active at the save can be drawn, and events and gates are
+  drawn as stored, so a workspace drawn on a linear assay, which the app
+  shows through a transform, is not reproduced. A quadrant’s shares are
+  written in the corners of the plot; `quadrant_labels = "centre"`
+  writes them where the app does.
+
+## GateLabR 1.6.0
+
+- `launchGatingApp(sce, agent = TRUE)` opens the tab connected to an
+  agent’s relay (GateLab’s `tools/agent-mcp/server.mjs`, an MCP server):
+  the launcher reads the address the relay recorded in
+  `~/.gatelab/agent-relay.json`, or takes a `ws://` address as `agent`,
+  and puts it on the page’s URL, so the tab connects as it opens. An
+  agent then reads the gating as you see it and proposes gates, which
+  appear in the tab with a badge; you adjust or undo them as any other,
+  and saving stays yours. The Agent menu in the header connects a tab by
+  hand.
+- [`launchGatingApp()`](https://david-priest.github.io/GateLabR/reference/launchGatingApp.md)
+  returns at once when the installed Shiny can run an app in the
+  background (1.14.0 and later,
+  [`shiny::startApp()`](https://rdrr.io/pkg/shiny/man/startApp.html)),
+  so the prompt is free while the tab is open: run a chunk, read the
+  object, draw a gate, in any order. The app is serviced while R is
+  idle, so a long computation pauses it until the prompt returns.
+  [`gatelabStop()`](https://david-priest.github.io/GateLabR/reference/gatelabStop.md)
+  stops it, as does the handle the launch returns; a second launch stops
+  the first. With an older Shiny the launch blocks as before and says
+  how to change that; `blocking = TRUE` keeps the old behaviour,
+  `blocking = FALSE` insists and is an error without Shiny 1.14.
+- While the app runs, a change to the object at the console
+  (`sce$cluster <- ...`, which rebinds the name) is kept: the app’s next
+  save sees that the global name no longer holds the object it last
+  wrote, refuses the write with a message naming
+  [`gatelabSync()`](https://david-priest.github.io/GateLabR/reference/gatelabSync.md),
+  and leaves the console’s object as it is. `gatelabSync("sce")` hands
+  the console’s object to the app, which then saves into it; the cells
+  must be the same, since the browser keeps the events it loaded. A
+  read, such as Colour by, never writes the object. Before, every save
+  assigned the app’s copy over the global name, which in a blocking
+  launch nothing else could have changed.
+- The embedded GateLab core is 0.9.0 (GateLab-dev 2acc33a), up from
+  master 8b1f206 in 1.5.1: pooled plots in the Illustration, Layout and
+  Strategy tabs, a Layout sheet drawn once per value of a metadata
+  column, an “All events” switch wherever a plot samples its events,
+  scatter axes that open linear (a saved workspace keeps its scale), the
+  agent link, and key names for the user’s keyboard. The browser app’s
+  walkthrough tutorial and its demo workspace are not shown under the
+  SCE host. Workspaces saved by 1.5.1 open unchanged.
+- When the app stops with no population memberships stored in the
+  object, or with memberships older than the workspace, the launcher
+  warns:
+  [`gatelabPopulations()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md)
+  and
+  [`gatelabHierarchy()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md)
+  need an explicit “Save to SCE”, which autosaves do not replace.
+  Before, the refusal came only at the first read.
+- The embedded core must carry GateLab’s agent link (GateLab-dev
+  [\#374](https://github.com/david-priest/GateLabR/issues/374)) for
+  `agent` to connect; the embed is its own change.
+
+## GateLabR 1.5.1
+
+- The embedded GateLab core is GateLab master 8b1f206, up from the 0.8.4
+  release: the pooled view follows the selection and is editable, and a
+  mass cytometry SCE opens pooled; the files off the plot are gated in
+  batches between paints, so an edit over hundreds of samples no longer
+  waits on one render per sample; the composition chart orders sample
+  groups numerically; and the header offers the SCE’s assays by name,
+  with `exprs` drawn as stored, as the next bullets describe. Open an
+  SCE saved by this version with this version or later: a workspace
+  saved into the SCE records the assay it was drawn from, which 1.5.0
+  ignores, drawing the linear counts assay, and refuses outright when
+  the workspace holds a compensation profile.
+- A workspace whose gate names a channel the SCE lacks is stored, and
+  the gate and the channel are named in the console, once; it was
+  refused, with the gate’s id reported as a channel, so nothing drawn in
+  the session reached the object once a row had been renamed. At launch,
+  rows renamed since the workspace was saved are recognised from the
+  channel list the save recorded, when the two lists differ by renames
+  alone, and the gates that named them are restated; the object changes
+  when the app next writes to it.
+- The app’s header offers the SCE’s assays by name and draws the chosen
+  one: a linear assay through its instrument transform, a display-space
+  assay as stored, through the arcsinh its values are in. The dataset’s
+  default is a display-space `exprs` when the object has one, since that
+  is what an analysis in R works on, corrected or not; otherwise
+  `counts`. A display assay carries the cofactor of its arcsinh
+  (`metadata(sce)$cofactor`, else a one-number
+  `int_metadata(sce)$cofactor`, else 5, said to be assumed); an assay
+  named for its counts (`normcounts`) is linear, and one whose name says
+  nothing is placed by its values. The launch note lists every assay,
+  its space, its role and how it is drawn, in place of the inference
+  that an `exprs` differing from asinh(counts/cofactor) is
+  “compensated”. Needs the embedded GateLab core of the matching
+  release; an earlier core draws the linear counts assay whatever the
+  default.
+
+## GateLabR 1.5.0
+
+- The embedded GateLab core is 0.8.4 (GateLab 0a701a1), up from 0.7.7.
+  From 0.8.0 a workspace holds one population tree, which every file
+  follows and which a file or a group of files can tailor with
+  coordinates of its own; a workspace saved with several trees still
+  opens, and Delete brings it down to one.
+- The Layout tab arrives under the SCE host as in the browser app: a
+  page editor where plots, gating-strategy strips, summary charts,
+  Illustration figures and text are arranged on a page set in
+  millimetres, drawn once per sample or per population in batch mode,
+  titled by a template built from the object’s `colData` columns with a
+  chip builder, and exported as PDF, SVG or PNG. The Illustration tab
+  sends a panel, a row, a column or a selection across with its
+  arrangement and its headings.
+- The Gating tab gained the tools for gates that share a border: a
+  vertex snaps to other gates and to the plot’s edges, Close gaps puts
+  the facing edges of neighbouring gates on one line, Extend to edges
+  puts a gate’s outward sides on the axis limits or the nearest gate, a
+  right-click on a polygon’s vertex or edge deletes or adds a vertex,
+  Shift while dragging a vertex holds its edge horizontal, vertical or
+  at 45 degrees, and undo and redo sit beside the draw tools. A gate
+  label moved on any tab is moved on every tab.
+- Groups can be made from a metadata column, which under the SCE host is
+  a `colData` column constant within each sample. Revert workspace,
+  which the browser app offers from its local checkpoints, is not
+  offered under the R host, where the object is the workspace and Save
+  to SCE is the record.
+- A rectangle drawn in GateLab now follows Gating-ML’s half-open rule,
+  so an event lying on its upper edge on either axis is outside it; a
+  rectangle saved before keeps the closed rule it was evaluated with.
+  With “Evaluate gates as FlowJo does”, which the FlowJo import dialogs
+  offer and which is on by default, polygons imported from a FlowJo
+  workspace are held on FlowJo’s gate grid and rectangles are clamped to
+  the axis as FlowJo clamps them, except on a gained or compensated
+  linear axis, and one lying wholly beyond where FlowJo clamps is
+  counted as drawn and named; a polygon whose gate resolution is not 256
+  is held on a grid of that many channels, which has not been measured
+  against FlowJo. In either mode, polygons with no gate resolution or on
+  a Time, FlowJo ArcSinh, Logicle or gained linear axis, ellipses, curly
+  quadrants and quadrant gates are evaluated continuously, and FlowJo
+  biex axes are read on FlowJo’s 4,096-channel table. A file compensated
+  with a matrix the workspace supplied is saved with that matrix. Save
+  hierarchy CSV writes a half-open rectangle’s ranges as `lo..<hi`,
+  which Import hierarchy CSV in GateLabR 1.4.5 to 1.4.7 refuses, naming
+  the line.
+- Open an SCE saved by this version with this version or later; earlier
+  versions are not a supported way to open it. A workspace saved into
+  the SCE carries a list of the features it needs (`requiredFeatures`)
+  where it holds a polygon on FlowJo’s gate grid, a biex axis on
+  FlowJo’s 4,096-channel table, a file compensated with a matrix a
+  FlowJo workspace supplied, or a half-open rectangle. Where the SCE
+  carries a compensation profile, the workspace is saved as version 3,
+  with the list if it holds any of the four; otherwise it is saved as
+  version 4, the version 2 layout plus the list, if it holds any of the
+  four, and as version 2 if it holds none. GateLabR 1.4.0 to 1.4.7 load
+  the data of an SCE saved as version 4 or version 3 without its gates
+  and report that its saved GateLab workspace could not be restored:
+  their GateLab 0.7 core refuses version 4 by its version, and refuses a
+  version 3 workspace from this core, with the list or without it, for
+  fields it does not know. Given a version 2 workspace in which a file
+  is tailored or a group has gates of its own, 1.4.5 to 1.4.7 report the
+  same, because each tree now owns its gates and their core looks for
+  every tree’s gates in the active tree’s table. They report the same
+  for a version 2 workspace that keeps several trees from an older save
+  where one of its trees has a gate the active tree lacks, and otherwise
+  open it with every tree on the active tree’s gates, so a gate changed
+  in one tree since that save is read in each as the active tree holds
+  it. 1.4.0 to 1.4.4 restore only the tree that was active when it was
+  saved and read every file under it without a message, a tailored file
+  on the tree’s coordinates. In each case a gate drawn, or “Save to SCE”
+  pressed, in that session then replaces the workspace saved in the SCE
+  with the session’s own. Where 1.4.0 to 1.4.7 restore a version 2
+  workspace, a curly quadrant comes back with straight arms and no
+  message, since their core evaluates every quadrant gate as a straight
+  crosshair. What 1.4.x makes of a gate imported from Gating-ML on flog
+  or on a bounded transformation has not been established.
+- GateLabR 1.3.0 and earlier load the `metadata(sce)$gating_workspace`
+  mirror with no version check, and can read its gates wrongly, since
+  they know neither the half-open rule nor FlowJo’s grid and table. The
+  mirror holds the active tree alone: reloaded from the mirror, this
+  core restores that tree’s gates, but not a tailored file’s or a
+  group’s own gates, nor a matrix a FlowJo workspace supplied, which
+  live only in the canonical record. GateLabR’s restore carries that
+  matrix with the workspace but does not reinstall it, so once the SCE
+  is reopened, gates on that file’s compensated channels can select
+  other events than when they were saved.
+- The embedded Gating-ML importer reads a population’s excluded gate
+  from the schema’s `gating:use-as-complement="true"` as well as from
+  `gating:complement="true"`, which GateLab wrote before. The Cytobank
+  format now writes the schema’s attribute, and the standard format
+  writes a NOT gate. An OR population, or one that uses a gate placed
+  beneath a population that is not its ancestor, is left out with
+  everything beneath it and named in a warning, and the rest of the file
+  is imported. Before, a file with an OR population was refused.
+  Gating-ML that this core exports is refused by GateLabR 1.3.0 to
+  1.4.7, with “Invalid embedded GateLab compensation state: unsupported
+  matrix reference.” in the R import and with GateLab’s message in the
+  GateLab window. GateLabR 1.0.0 to 1.2.2 have no such check: they
+  import these files without any warning and misread them. They leave
+  out every range gate and every ellipse, take an excluded gate as
+  included, and, from the standard format, place the logicle gates of a
+  flow cytometry file 4.5 times too low on their axis. Do not open
+  Gating-ML from this core with GateLabR 1.2.2 or earlier; the GateLab
+  0.8.4 release notes give the full list.
+- Save to SCE, Export populations to colData and the Statistics tab read
+  each file under the tree it is gated under. Export populations to
+  colData names each column by the population’s own name, such as
+  `CD4-CD8+ T cells`, where earlier cores replaced every run of other
+  characters with “\_” (`CD3_cells` for “CD3+ cells”). Read such a
+  column with `sce[["CD4-CD8+ T cells"]]` or backticks, and give
+  [`data.frame()`](https://rdrr.io/r/base/data.frame.html) and
+  [`read.csv()`](https://rdrr.io/r/utils/read.table.html)
+  `check.names = FALSE`. An SCE whose populations an earlier core
+  exported gets the new columns beside the old ones when it is exported
+  again. Populations that share a name are prefixed with their nearest
+  differing ancestors, joined by ” / ”
+  ([`gatelabHierarchy()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md)
+  joins a path with ” \> “).
+- Population memberships follow the events, not their positions. “Save
+  to SCE” now writes each event’s id to `colData(sce)$gatelab_event_id`,
+  and
+  [`gatelabPopulations()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md),
+  [`gatelabLeafPopulation()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md)
+  and
+  [`gatelabHierarchy()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md)
+  find every event’s saved membership through it. The stored bitsets
+  used to be read by position, with only the column count compared, so a
+  reordered SCE read other events’ memberships with no error; so did two
+  events of one sample swapping places in an object without column
+  names, which is how CATALYST’s `prepData()` builds one. A subset now
+  reads the memberships of the events it kept, and an object that
+  repeats saved events reads each copy’s own.
+- An event that cannot be traced to the save is refused rather than
+  guessed: one added by [`cbind()`](https://rdrr.io/r/base/cbind.html)
+  from another object, one in an object whose `gatelab_event_id` column
+  was removed, or one whose id lost precision, by passing through a
+  32-bit float as an FCS channel does or by being written with fewer
+  than 15 significant digits. Every id a save writes is odd, and an id
+  that loses precision becomes even, so it is never read as another
+  event’s id.
+- [`cbind()`](https://rdrr.io/r/base/cbind.html) needs
+  `gatelab_event_id` on both objects. Give the object that lacks it the
+  column as `NA` (`other$gatelab_event_id <- NA_real_`) rather than
+  dropping it from the saved one; the saved events then read again once
+  the combined object is subset back to them. A cbind of two separately
+  saved SCEs is refused until it is subset back to the events of one
+  save, which then read that save’s memberships, or until “Save to SCE”
+  is pressed on the combined object; that save now replaces the records
+  [`cbind()`](https://rdrr.io/r/base/cbind.html) kept from both. The
+  memberships are read from whichever record
+  [`cbind()`](https://rdrr.io/r/base/cbind.html) kept them in, so a
+  saved object combined after one that was never saved with memberships
+  reads as it does in the other order, where it had been refused as
+  holding none.
+- Memberships saved by 1.4.6 or 1.4.7 carry no event ids and are refused
+  until “Save to SCE” is pressed again.
+- A population can now arrive from GateLab as not evaluated for a file:
+  the tree that file is gated under, a copy whose structure was changed,
+  has no counterpart for it, so GateLab sends no bits for the file’s
+  events and a note naming the file, the population and the file’s tree.
+  GateLabR refused such a mask as a short payload (“Population
+  membership payload has 0 bytes”), which failed the whole “Save to SCE”
+  or colData export. The file’s events are now `NA` in that population,
+  never `FALSE`: in the stored memberships, so
+  [`gatelabPopulations()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md)
+  returns `NA` and
+  [`gatelabLeafPopulation()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md)
+  returns `NA` for an event whose deepest population it could be; and in
+  an exported `colData` column, under neither label. The save, the
+  export and every read that returns such an `NA` warn with the note.
+  [`gatelabHierarchy()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md)
+  counts only the events a population was evaluated for. The embedded
+  GateLab 0.8.4 core sends these masks.
+- Memberships are stored under a new name,
+  `gatelab-sce-population-memberships`, as record version 3, where they
+  were named `gatelab-sce-memberships`. GateLabR 1.4.6 and 1.4.7 accept
+  a record by that name and its event count alone and never read its
+  version, so under the earlier name they would have read memberships
+  saved by this version with no error, taking the events a population
+  was not evaluated for as outside it and reading every event by its
+  position. Under the new name they refuse them, saying that no
+  population memberships are stored; read them with this version or
+  later. This version reads records under either name as before, and
+  refuses a record under the new name whose version it does not know, so
+  that a later layout can be refused by its version.
+- The message GateLabR 1.4.6 and 1.4.7 give for such a record asks for
+  “Save to SCE”. Pressed there, “Save to SCE” replaces this version’s
+  record with one of theirs, which carries no event ids and is refused
+  here until “Save to SCE” is pressed again. An autosave in 1.4.6 or
+  1.4.7 keeps this version’s record but moves the workspace on, so this
+  version then reads those memberships only with `allow_stale = TRUE`.
+  GateLabR 1.4.0 to 1.4.5 read no memberships, and drop this version’s
+  record on their next save or autosave.
+- The sample metadata sent to the app keeps `colData` names exactly. The
+  partition converted `colData` with
+  [`as.data.frame()`](https://rdrr.io/r/base/as.data.frame.html), which
+  runs [`make.names()`](https://rdrr.io/r/base/make.names.html), so a
+  column GateLab had written under a population’s own name, such as
+  `CD4-CD8+ T cells`, reached the app as `CD4.CD8..T.cells`, a field no
+  `colData` column has, and a second such name as `CD4.CD8..T.cells.1`.
+- A workspace GateLab saves as version 4 is stored. GateLab writes
+  version 4, the version 2 layout with a list of `requiredFeatures`, for
+  a workspace holding something an older GateLab would read wrongly: a
+  polygon on FlowJo’s gate grid, a biex axis on FlowJo’s 4,096-channel
+  table, a file compensated with a matrix a FlowJo workspace supplied,
+  or a half-open rectangle, which every rectangle drawn in GateLab 0.8.4
+  is. GateLabR stored versions 2 and 3 only, so “Save to SCE” and every
+  autosave of such a workspace would have been refused. A workspace with
+  a compensation profile keeps version 3 and carries the same list,
+  which GateLabR stored already. The JSON is stored as GateLab wrote it,
+  and the `metadata(sce)$gating_workspace` mirror now keeps each gate’s
+  edge rule (`bounds`) and the FlowJo definition a gate imported from a
+  FlowJo workspace carries (`flowjo_vertices`, `flowjo_axes`,
+  `flowjo_bounds`, `flowjo_polygon`), so a half-open rectangle reloaded
+  from the mirror alone no longer counts an event on its upper edge. A
+  workspace R writes for the app, the mirror among them, is now written
+  with 17 significant digits, which name every double exactly. It was
+  written with 15, so the largest double, which GateLab writes for an
+  unbounded edge, became `1.79769313486232e+308`, a number both R and
+  JavaScript read as infinite: GateLab refused every gate with an open
+  edge reloaded from the mirror alone, and a vertex or transform
+  parameter needing 16 or 17 digits came back as another number. A
+  workspace’s version must be the number 2, 3 or 4: it was read with
+  [`as.integer()`](https://rdrr.io/r/base/integer.html), so 4.5 and the
+  string `"4"` were stored as version 4, and 2.5 and 3.5 as versions 2
+  and 3. The embedded GateLab 0.8.4 core writes version 4 workspaces.
+- Channel identities are read from `rowData` columns named `$pnn` and
+  `$pns`. `rowData` was converted with
+  [`as.data.frame()`](https://rdrr.io/r/base/as.data.frame.html), which
+  renamed them `X.pnn` and `X.pns`, so they were never found: the
+  channels reached the app without their \$PnN and \$PnS, and instrument
+  detection lost the \$PnN evidence.
+- The `metadata(sce)$gating_workspace` mirror now keeps each gate’s
+  coordinate space and transforms. On a flow object, a workspace
+  reloaded from the mirror alone, with no canonical record, read an
+  ellipse, a gate drawn in display space and a FlowJo biex or log gate
+  as raw values, so the gate selected other events. The mirror of an
+  object whose instrument GateLabR cannot tell from its channels or
+  metadata no longer declares one space for all its gates: the core,
+  which gates such an object as flow unless its channels say otherwise,
+  took that declaration as a reason to convert every gate, including
+  those whose own space it had just been given, so display-space
+  rectangles and polygons reloaded from the mirror selected no events.
+- The README now describes the Gating-ML importer that
+  [`launchGatingApp()`](https://david-priest.github.io/GateLabR/reference/launchGatingApp.md)
+  runs, which is the embedded GateLab core’s and not the retired R one:
+  the gates and populations it reads, both forms of an excluded gate it
+  accepts, and the populations it leaves out and names. A population
+  that excludes a gate has not been shown to cross to Cytobank, and the
+  README says so.
+- The R Gating-ML importer under `inst/app`, which served the Shiny
+  interface retired in 1.4.0, reads GateLab’s Gating-ML as GateLab 0.8.4
+  writes it (format mark versions 2 and 3, `parent_id` trees,
+  `spectrumMatrix`, Gating-ML’s own flog, transformation bounds, edges
+  with no bound, and Time in seconds and coordinates divided by \$PnG
+  where the caller gives the data’s `timestep` and `gains`), and files
+  from other writers by Gating-ML 2.0’s model, where it had measured
+  every population against all events. The Shiny interface gives neither
+  `timestep` nor `gains`, so there a standard-format GateLab file with a
+  Time gate is refused and every gain is taken as 1; other writers’
+  rectangles are read closed, and their Time in ticks. NOT and OR
+  populations stay refused by name. A name is matched to a channel with
+  letters outside ASCII and the signs “+” and “-” kept, and is taken for
+  a metal only on mass cytometry data (`instrument = "cytof"`) where it
+  spells an element with a natural mass, so a gate on TCRγδ is no longer
+  read on TCRαβ, nor one on CD3- on CD3+, nor one on CD11c on CD11b. A
+  logicle outside Gating-ML 2.0’s bounds, which had been read as the
+  identity, and a gate number that is not a finite xs:double, which had
+  been read without a message, are refused by name. A two-dimensional
+  ellipse is read as its boundary, where the file had been refused.
+  [`launchGatingApp()`](https://david-priest.github.io/GateLabR/reference/launchGatingApp.md)
+  imports Gating-ML through the embedded core, whose channel matching
+  follows the same rules.
+- The R Gating-ML importer under `inst/app` reads a logicle whose W or A
+  lies past its upper bound (W \<= M/2, A \<= M - 2W) by at most 1e-12
+  of M as on the bound, as GateLab does, so a logicle written in decimal
+  with A at M - 2W (M = 4.42, W = 0.87, A = 2.68, for example) is read
+  as that logicle. flowCore refuses such a value, and that importer in
+  GateLabR 1.4.7 then took the gate’s coordinates as raw values without
+  a message.
+  [`launchGatingApp()`](https://david-priest.github.io/GateLabR/reference/launchGatingApp.md)
+  imports through the embedded core, which reads such a logicle the same
+  way.
+- The sync tool skips every path under GateLab’s `public/` folder,
+  subfolders included, so browser-check data staged there is never
+  copied into the package.
+
+## GateLabR 1.4.7
+
+- The embedded GateLab core is 0.7.7 (GateLab master at 7b99de0), up
+  from the 0.7.6 build. The change that matters for an SCE is that
+  samples can now be selected by their `colData`. GateLabR already
+  collapsed every column constant within a sample and sent one value per
+  sample; the samples panel now draws those as a row of value chips per
+  column, so a sixty-sample object is picked over by donor, condition or
+  batch rather than by hunting through sixty checkboxes.
+- A chip is a bulk checkbox over the checked set rather than a filter:
+  clicking one checks every sample carrying that value, or unchecks them
+  when they are all checked already, and a partly checked chip is filled
+  to the fraction that is checked. The sample list itself is never
+  narrowed.
+- Each chip row carries a padlock. Holding one row fixed bounds every
+  later chip click to the samples that row holds, so a cell type can be
+  held while the stimulation is switched — which the chips alone cannot
+  express, since a checked set does not record why the other files are
+  out. What is held is written on the row, because the checked set feeds
+  the pooled display, Statistics and Proportions.
+- A `colData` column without a value for every sample is not treated as
+  sample metadata. A gate written back into `colData` is per-event, so
+  it reaches the app only for samples whose events were entirely `TRUE`
+  or entirely `FALSE`; such a column is kept out of the automatic chip
+  rows and, where it is chosen by hand, marked with the number of
+  samples it actually reaches.
+- Also from the core: files can be assigned per hierarchy, marked by a
+  numbered colour badge, and a FlowJo workspace import now brings in
+  every tree rather than the first.
+
+## GateLabR 1.4.6
+
+- “Save to SCE” now stores which events every population holds, for
+  every hierarchy, beside the workspace in
+  `metadata(sce)$gatelab_workspace$memberships`, as one packed bitset
+  per population. Four functions read it back without re-gating in R:
+  [`gatelabHierarchies()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md),
+  [`gatelabHierarchy()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md)
+  (one row per population with parent, depth, path, gates and count),
+  [`gatelabPopulations()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md)
+  (a logical events-by-populations matrix) and
+  [`gatelabLeafPopulation()`](https://david-priest.github.io/GateLabR/reference/gatelabMemberships.md)
+  (each event’s deepest population as a factor, or “ungated”). The
+  memberships remember the workspace revision they were computed at;
+  after an autosave has moved the workspace on they are refused until
+  the next explicit save, unless `allow_stale = TRUE`. Reading them on a
+  subset SCE is refused, since the masks assume the original event
+  order.
+- “Colour by” now offers the SCE’s categorical `colData` columns: any
+  factor, character or logical column with at most 254 levels, such as a
+  FlowSOM or CATALYST merge level, so cluster composition can be watched
+  while a gate is drawn. The dataset payload carries only the column
+  names and level counts; a column’s values are fetched when it is
+  chosen, once, in the per-sample coded form the categorical export
+  already uses. A named colour vector in
+  `metadata(sce)$gatelab_palettes[[column]]` fixes the colours so the
+  app matches the analysis figures.
+- Running from a clone with `source("launch.R")` now sources every file
+  under `R/`, so functions added in new files are defined the same way
+  as in the installed package.
+- The embedded GateLab core is GateLab-dev master at 7883c8a (0.7.5 plus
+  the pooled gate label, memberships on explicit save, and Colour by
+  colData), which sends the memberships with an explicit save and, when
+  the plot pools several checked files, labels gate counts pooled over
+  the same files.
+
+## GateLabR 1.4.5
+
+- The embedded GateLab core is 0.7.5 (GateLab-dev master at c415f99), up
+  from 0.7.2. What that brings into the R host:
+- Several population hierarchies over one shared gate table. The menu at
+  the top of the populations list switches between them and can create
+  an empty one, duplicate the current one, rename it or delete it; the
+  gates stay when a hierarchy goes. Undo works across a switch. A
+  workspace saved into the SCE with several hierarchies now reloads with
+  all of them; the first build of this core restored only the active
+  one, which is fixed in the same commit.
+- A hierarchy you can write by hand. Import hierarchy CSV reads gate
+  lines and population lines, with parents and NOT references, and for a
+  CyTOF debarcoding scheme a sample table beneath them; Save hierarchy
+  CSV writes any workspace the same way. The barcode scheme import
+  builds a debarcoding strategy from the run’s sample table, with the QC
+  populations from a template or from the file, and can send a second
+  scheme into its own hierarchy while reusing the gates already present.
+- In the population tree the blue highlight is a selection: shift-click
+  a range, Cmd or Ctrl-click to add or remove a row, shift-drag to move
+  the highlighted rows together. The checkboxes keep their old role,
+  with All and None above the list.
+- Fixed: the four handles of an ellipse gate sit at the ellipse’s
+  on-screen vertices; before, two of them sat off the drawn shape
+  whenever the axes had different pixel scales.
+- Fixed: a workspace saved by 0.7.0 or later could not be reopened by
+  the file reader, which had not been told about two per-sample scale
+  lists.
+- Fixed: three FlowJo workspace conventions that imported wrong without
+  error: a parameter written with an underscore for its slash, Time
+  gates stored in seconds, and leaf names that recur under several
+  parents.
+- Every open, folder and save dialog starts in the folder the user last
+  opened or saved from.
+
+## GateLabR 1.4.4
+
+- Fixed: an assay whose name says it is uncompensated could still be
+  reported to the app as compensated. The bridge decides whether a
+  display-space assay already carries compensation by trying to
+  reproduce it as `asinh(counts / cofactor)` and treating a mismatch as
+  evidence, and that inference was allowed to overrule the name — so an
+  assay called `exprs_uncomp` arrived marked compensated. A probe that
+  cannot reproduce a transform has other explanations besides
+  compensation: a different cofactor, a different transform family, a
+  scaled or corrected assay. The name now wins where it explicitly says
+  uncompensated. A neutral name such as `exprs` is still decided from
+  the data, which is the case that detection exists for.
+- The R test suite passes again. Two host-bridge tests had been failing
+  since the compensation detector was added on 2026-08-04, and were
+  released red in 1.4.0 through 1.4.3; one was this defect, the other a
+  fixture whose `exprs` was a plain rescale rather than a transform.
+- The embedded GateLab core is unchanged at 0.7.2.
+
+## GateLabR 1.4.3
+
+- Added: the manage dialog can reorder the loaded files by name, in
+  either direction. Sorting is numeric-aware, so exp10 follows exp9
+  rather than exp1, and case-insensitive. This is the workspace’s own
+  sample order, so it also drives the samples panel and is saved with
+  the workspace.
+- Changed: on the Illustration tab the contour bandwidth is now always
+  shown, rather than appearing only after switching off automatic
+  smoothing. It reads “auto” while automatic and can be set by hand once
+  automatic is off. Nothing about the rendering changes, but the
+  automatic value depends on the plotted event count and the panel size,
+  so being able to see and pin it is what lets a contour here be matched
+  to the same population in the gating plot.
+- The embedded GateLab core is 0.7.2.
+
+## GateLabR 1.4.2
+
+- Fixed: a gate could quietly change meaning when a workspace was
+  reopened from the SCE. Each gate records the coordinate space its
+  numbers live in, and the axis transforms it was drawn under, and both
+  survive the SCE untouched — but reading the workspace back dropped
+  them, so a gate saved in display space came back read in the sample’s
+  default. The same coordinates then selected a different set of events,
+  with nothing on screen to say so. Ellipses were affected every time,
+  because a drawn ellipse is always created in display space: an ellipse
+  on screen is not an ellipse in raw space, so converting it would bend
+  it into something else. The fields are now restored for every gate
+  type, and a workspace carrying a transform GateLabR cannot read is
+  refused rather than loaded as though the gate had none.
+- Added: FCS files can be dragged onto the samples panel to load them,
+  which does the same thing as the “+ Files…” button. Folders still go
+  through “+ Folder…”.
+- Faster: editing a gate on a large workspace. On four files totalling
+  6.2 million events, moving a gate near the top of the hierarchy took
+  about 790 ms of work before the interface could respond, and now takes
+  about 300 ms. Gates whose shape did not change are no longer
+  re-measured, each population is examined only over the events its
+  parent holds rather than the whole file, and the Illustration tab’s
+  per-sample figures are no longer rebuilt while that tab is closed.
+- The embedded GateLab core is 0.7.1.
+
+## GateLabR 1.4.1
+
+- Fixed: saving into the SCE could fail permanently with a workspace
+  revision conflict, reporting that the browser expected one revision
+  while the SCE was at the next, and recovering only when the user
+  reloaded. The SCE advances on every accepted write, but the browser
+  learns the new revision only from that write’s reply, so a reply lost
+  to a closing session, a reconnect or a replaced tab left the browser a
+  revision behind for good and every later save was rejected. Because
+  exporting populations saves the workspace first, this also blocked
+  writing populations to `colData` before any of that work began. Writes
+  now record which browser made them, and a conflict reports the stored
+  revision and its writer, so a browser that recognises its own lost
+  write resyncs and retries instead of stalling. A conflict raised by a
+  genuinely different session still stops and says so, rather than
+  overwriting that session’s work.
+
+## GateLabR 1.4.0
+
+- **Breaking:**
+  [`launchGatingApp()`](https://david-priest.github.io/GateLabR/reference/launchGatingApp.md)
+  now starts the shared GateLab TypeScript/React interface and is the
+  single supported entry point.
+  [`launchLegacyGateLabR()`](https://david-priest.github.io/GateLabR/reference/launchLegacyGateLabR.md)
+  is defunct and the previous GateLabR-specific Shiny interface is no
+  longer reachable; calling it signals an error explaining the change.
+  The former Shiny-only UMAP view goes with it and is not yet available
+  in the React interface.
+- SCE assays are streamed lazily through a thin R host with explicit
+  linear versus display-coordinate contracts. Compensation Apply runs in
+  a cancellable background R process and installs revisioned assays
+  atomically. Panel labels, population memberships, division calls and
+  editable sample annotations have explicit
+  [`rowData()`](https://rdrr.io/pkg/SummarizedExperiment/man/SummarizedExperiment-class.html)
+  /
+  [`colData()`](https://rdrr.io/pkg/SummarizedExperiment/man/SummarizedExperiment-class.html)
+  write-back actions, and canonical workspaces, compensation provenance
+  and assay bindings persist inside the SCE and restore without
+  recomputation.
+- Gates carry the coordinate space they were drawn in. A flow gate
+  records whether its vertices are straight in raw channel values or in
+  the transform it was drawn under, so moving a display control can no
+  longer move an event in or out of a gate. Two letters on each gate
+  label name the space of its x and y axes. Older workspaces are
+  unaffected: a gate with no recorded space resolves to what that sample
+  did before the field existed.
+- Elliptical gates can be drawn, resized and rotated. An ellipse is
+  dragged out from its centre and carries four handles at its axis ends;
+  dragging one sets that axis and turns the ellipse to follow the
+  cursor, so rotation needs no separate control. Ellipses are stored the
+  way Gating-ML stores them, as a mean, a covariance matrix and the
+  squared distance its boundary sits at, and membership is evaluated
+  from those numbers rather than from a sampled outline.
+- Gates that belong to no population stay visible, controlled by an
+  Unowned gates checkbox beside Branch gates. Such a gate sits in no
+  branch, so branch scoping could only hide it by accident.
+- FlowJo `.wsp` workspaces open directly, with their own compensation
+  matrix and a picker when the workspace is ambiguous. FlowJo’s biex and
+  log transforms are implemented, so imported gates land where FlowJo
+  evaluates them.
+- BD FACSDiva experiment XML can be imported, bringing across the gate
+  tree, the per-tube compensation matrices and Diva’s biexponential
+  display, which is a Logicle in disguise.
+- Gating-ML export declares the transform each gate’s vertices are
+  actually straight in, and import reads `transformation-ref` the way
+  the specification means it. Cytobank export carries the compensation
+  matrix as a spectrumMatrix block, derives each channel’s scale range
+  from the data rather than assuming one, and collapses the extra
+  vertices that densifying a curved edge adds.
+- Fluorescence channels can be displayed with arcsinh instead of
+  logicle, with an adjustable cofactor. Gate edges can be drawn
+  straight, straight with a grey true edge, or bowed. Channels can be
+  named with their detector as well as their marker, throughout the
+  interface.
+- Plots draw at the display’s resolution rather than in CSS pixels, and
+  the Strategy, Illustration and Compensation grids colour by the same
+  quantile rank the gating plot uses.
+- Fixed: a polygon with a repeated vertex selected every event in its
+  bounding box. The repeated point produced a zero-length edge, which
+  the crossing test read as lying on the boundary, so the gate quietly
+  reported far more events than it contained. Any polygon whose outline
+  had been densified and read back in was affected.
+- Fixed: a workspace holding an elliptical gate aborted the SCE
+  autosave, reporting that the gate had invalid vertices. An ellipse has
+  no vertices, but the workspace mirror required them of every gate that
+  was not a quadrant. The mirror now records the ellipse parameters and
+  adds a sampled boundary alongside them, so anything reading vertices
+  still receives the correct geometry while membership stays defined by
+  the covariance.
+- Fixed: CyTOF Gaussian channels such as Width keep their declared
+  arcsinh space on Gating-ML import, instead of being read as raw and
+  landing far below the data.
+- Fixed: dragging a gate that was not already selected no longer snaps
+  it back, so moving a gate no longer takes two attempts.
+- Fixed: exporting a gating strategy to FCS no longer loses sibling
+  populations to a file-name collision. `CD45RB+IgD+` and `CD45RB-IgD+`
+  both sanitised to one name and each later export overwrote the earlier
+  one.
+- Older workspaces with list-encoded gate coordinates are normalized
+  without changing their geometry. The core sync no longer copies
+  GateLab’s local development sample data into this package.

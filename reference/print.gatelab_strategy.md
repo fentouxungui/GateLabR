@@ -57,6 +57,6 @@ file <- tempfile(fileext = ".pdf")
 grDevices::pdf(file, width = 300 / 96, height = 300 / 96)
 print(panel)
 grDevices::dev.off()
-#> agg_record_8ba067463efd 
+#> agg_record_186e69d84cbb 
 #>                       2 
 ```
